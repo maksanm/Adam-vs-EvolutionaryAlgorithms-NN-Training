@@ -29,24 +29,25 @@ def evaluate(model, dataloader, criterion):
             total_loss += criterion(outputs, targets).item()
     return total_loss / len(dataloader)
 
-def train_adam(model, dataloader):
+def train_adam(model, criterion, train_dataloader, val_dataloader):
     optimizer = optim.Adam(model.parameters(), lr=ADAM_LR)
 
     for epoch in range(ADAM_EPOCHS):
         model.train()
         epoch_train_losses = []
-        for inputs, targets in dataloader:
+        for inputs, targets in train_dataloader:
             optimizer.zero_grad()
             loss = criterion(model(inputs), targets)
             loss.backward()
             optimizer.step()
-            epoch_train_losses.append(loss.float())
+            epoch_train_losses.append(loss.item())
 
-        val_loss = evaluate(model, dataloader, criterion)
-        print(f'Epoch {epoch+1:3d}/{ADAM_EPOCHS} | Train loss: {sum(epoch_train_losses) / len(epoch_train_losses):.5f} | Val loss: {val_loss:.5f}')
+        train_loss = sum(epoch_train_losses) / len(epoch_train_losses)
+        val_loss = evaluate(model, val_dataloader, criterion)
+        print(f'Epoch {epoch+1:3d}/{ADAM_EPOCHS} | Train Loss: {train_loss:.5f} | Val Loss: {val_loss:.5f}')
 
-# GPT generated, TODO
-def train_cmaes_1_1(model, dataloader):
+# GPT-generated
+def train_cmaes_1_1(model, criterion, train_dataloader, val_dataloader):
     # Hyperparameters from the paper
     p_target = 0.25     # Target success rate
     c_p = 0.2           # Smoothing factor for success rate
@@ -58,7 +59,7 @@ def train_cmaes_1_1(model, dataloader):
 
     # Initialize parameters
     current_params = nn.utils.parameters_to_vector(model.parameters()).detach().clone()
-    best_loss = evaluate(model, dataloader, criterion)
+    best_loss = evaluate(model, train_dataloader, criterion)
 
     # Initialize covariance components
     C = torch.ones_like(current_params)  # Diagonal covariance
@@ -72,12 +73,12 @@ def train_cmaes_1_1(model, dataloader):
         y_new = torch.randn_like(current_params)
         v_new = current_params + sigma * A * y_new
 
-        # 2. Evaluate candidate
+        # 2. Evaluate candidate on training set
         nn.utils.vector_to_parameters(v_new, model.parameters())
-        candidate_loss = evaluate(model, dataloader, criterion)
+        candidate_loss = evaluate(model, train_dataloader, criterion)
 
-        # 3. Update smoothed success rate (corrected)
-        success = float(candidate_loss < best_loss)  # Convert to float first
+        # 3. Update smoothed success rate
+        success = float(candidate_loss < best_loss)
         p_succ = (1 - c_p) * p_succ + c_p * torch.tensor(success)
 
         # 4. Update step-size
@@ -101,8 +102,13 @@ def train_cmaes_1_1(model, dataloader):
 
             # 9. Update Cholesky factor with margin correction
             A = torch.sqrt(torch.clamp(C, min=min_var))
+        else:
+            # Revert parameters if candidate rejected
+            nn.utils.vector_to_parameters(current_params, model.parameters())
 
-        print(f'Gen {gen+1:3d}/{CMAES_GENERATIONS} | Loss: {best_loss:.5f} | σ: {sigma.item():.5f}')
+        # Calculate validation loss for logging
+        val_loss = evaluate(model, val_dataloader, criterion)
+        print(f'Gen {gen+1:3d}/{CMAES_GENERATIONS} | Train Loss: {best_loss:.5f} | Val Loss: {val_loss:.5f} | σ: {sigma.item():.5f}')
 
     # Restore best parameters
     nn.utils.vector_to_parameters(current_params, model.parameters())
@@ -123,14 +129,21 @@ with open(os.getenv("DATA_PATH")) as f:
         retention_times.append(float(rt))
 
 dataset = PeptideDataset(sequences, retention_times)
-dataloader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True)
+
+train_size = int(0.9 * len(dataset))
+val_size = len(dataset) - train_size
+train_dataset, val_dataset = torch.utils.data.random_split(dataset, [train_size, val_size])
+
+train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
+val_dataloader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False)
+
 model = RetentionPredictor()
 criterion = nn.MSELoss()
 
 # =================== RUN EXPERIMENTS ===================
 print("Training with Adam:")
-#train_adam(model, dataloader)
+train_adam(model, criterion, train_dataloader, val_dataloader)
 
 print("\nTraining with CMA-ES 1+1:")
 model = RetentionPredictor()  # Reset model
-train_cmaes_1_1(model, dataloader)
+train_cmaes_1_1(model, criterion, train_dataloader, val_dataloader)
