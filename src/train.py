@@ -1,7 +1,9 @@
 from dotenv import load_dotenv
 load_dotenv()
 
-import torch, os
+import os
+
+import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
@@ -19,6 +21,7 @@ CMAES_GENERATIONS = int(os.getenv("CMAES_GENERATIONS"))
 CMAES_SIGMA = float(os.getenv("CMAES_SIGMA"))
 CMAES_ADAPT_INTERVAL = int(os.getenv("CMAES_ADAPT_INTERVAL"))
 
+
 # =================== TRAINING FUNCTIONS ===================
 def evaluate(model, dataloader, criterion):
     model.eval()
@@ -28,6 +31,7 @@ def evaluate(model, dataloader, criterion):
             outputs = model(inputs)
             total_loss += criterion(outputs, targets).item()
     return total_loss / len(dataloader)
+
 
 def train_adam(model, train_dataloader, val_dataloader):
     optimizer = optim.Adam(model.parameters(), lr=ADAM_LR)
@@ -44,7 +48,8 @@ def train_adam(model, train_dataloader, val_dataloader):
 
         train_loss = sum(epoch_train_losses) / len(epoch_train_losses)
         val_loss = evaluate(model, val_dataloader, criterion)
-        print(f'Epoch {epoch+1:3d}/{ADAM_EPOCHS} | Train Loss: {train_loss:.5f} | Val Loss: {val_loss:.5f}')
+        print(f'Epoch {epoch + 1:3d}/{ADAM_EPOCHS} | Train Loss: {train_loss:.5f} | Val Loss: {val_loss:.5f}')
+
 
 def train_cmaes_1_1(model, train_dataloader, val_dataloader):
     # Hyperparameters from the paper
@@ -107,11 +112,12 @@ def train_cmaes_1_1(model, train_dataloader, val_dataloader):
 
         # Calculate validation loss for logging
         val_loss = evaluate(model, val_dataloader, criterion)
-        print(f'Gen {gen+1:3d}/{CMAES_GENERATIONS} | Train Loss: {best_loss:.5f} | Val Loss: {val_loss:.5f} | σ: {sigma.item():.5f}')
+        print(f'Gen {gen + 1:3d}/{CMAES_GENERATIONS} | Train Loss: {best_loss:.5f} | Val Loss: {val_loss:.5f} | σ: {sigma.item():.5f}')
 
     # Restore best parameters
     nn.utils.vector_to_parameters(current_params, model.parameters())
     return model
+
 
 # =================== DATA PREPARATION ===================
 sequences = []

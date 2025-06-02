@@ -1,5 +1,6 @@
 import torch.nn as nn
-import os, ast
+import os
+import ast
 
 
 class RetentionPredictor(nn.Module):
