@@ -33,7 +33,7 @@ def evaluate(model, dataloader, criterion):
     return total_loss / len(dataloader)
 
 
-def train_adam(model, train_dataloader, val_dataloader):
+def train_adam(model, criterion, train_dataloader, val_dataloader):
     optimizer = optim.Adam(model.parameters(), lr=ADAM_LR)
 
     for epoch in range(ADAM_EPOCHS):
@@ -51,7 +51,8 @@ def train_adam(model, train_dataloader, val_dataloader):
         print(f'Epoch {epoch + 1:3d}/{ADAM_EPOCHS} | Train Loss: {train_loss:.5f} | Val Loss: {val_loss:.5f}')
 
 
-def train_cmaes_1_1(model, train_dataloader, val_dataloader):
+# GPT-generated
+def train_cmaes_1_1(model, criterion, train_dataloader, val_dataloader):
     # Hyperparameters from the paper
     p_target = 0.25     # Target success rate
     c_p = 0.2           # Smoothing factor for success rate
@@ -147,8 +148,8 @@ criterion = nn.MSELoss()
 
 # =================== RUN EXPERIMENTS ===================
 print("Training with Adam:")
-train_adam(model, train_dataloader, val_dataloader)
+train_adam(model, criterion, train_dataloader, val_dataloader)
 
 print("\nTraining with CMA-ES 1+1:")
 model = RetentionPredictor()  # Reset model
-train_cmaes_1_1(model, train_dataloader, val_dataloader)
+train_cmaes_1_1(model, criterion, train_dataloader, val_dataloader)
