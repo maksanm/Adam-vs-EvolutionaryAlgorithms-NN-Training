@@ -43,7 +43,7 @@ def train_de(model, criterion, train_dataloader, val_dataloader):
     best_idx   = int(np.argmin(scores))
     best_vec   = population[best_idx].copy()
     best_score = scores[best_idx]
-    print(f"Initial best MSE = {best_score:.5f}")
+    print(f"Initial best loss = {best_score:.5f}")
 
     # Main loop
     for g in range(DE_GENERATIONS):
@@ -71,7 +71,7 @@ def train_de(model, criterion, train_dataloader, val_dataloader):
                 if score_trial < best_score:
                     best_score = score_trial
                     best_vec   = trial.copy()
-                    print(f"[gen {g:03d}] new best MSE = {best_score:.6f}")
+                    print(f"[gen {g:03d}] new best loss = {best_score:.6f}")
 
         print(f"Generation {g+1:3d}/{DE_GENERATIONS} | "
               f"pop-mean={scores.mean():.5f} | best={best_score:.5f}")
@@ -104,7 +104,7 @@ train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True
 val_dataloader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False)
 
 model = RetentionPredictor()
-criterion = nn.MSELoss()
+criterion = nn.SmoothL1Loss()
 
 # =================== RUN EXPERIMENT ===================
 print("\nTraining with Differential Evolution:")
