@@ -37,13 +37,13 @@ def train_de(model, criterion, train_dataloader, val_dataloader):
     population = np.stack([base] +
                           [base + np.random.normal(0, 0.1, size=dim)
                            for _ in range(DE_POP_SIZE - 1)])
-    scores = np.array([fitness(ind, model, val_dataloader, criterion)
+    scores = np.array([fitness(ind, model, train_dataloader, criterion)
                        for ind in population])
 
     best_idx   = int(np.argmin(scores))
     best_vec   = population[best_idx].copy()
     best_score = scores[best_idx]
-    print(f"Initial best loss = {best_score:.5f}")
+    print(f"Initial best train loss = {best_score:.5f}")
 
     # Main loop
     for g in range(DE_GENERATIONS):
@@ -59,11 +59,11 @@ def train_de(model, criterion, train_dataloader, val_dataloader):
 
             # 2) Binomial crossover
             cross = np.random.rand(dim) < DE_CR
-            cross[random.randrange(dim)] = True         # ensure ≥1 crossovers
+            cross[random.randrange(dim)] = True
             trial = np.where(cross, v, population[i])
 
             # 3) Selection
-            score_trial = fitness(trial, model, val_dataloader, criterion)
+            score_trial = fitness(trial, model, train_dataloader, criterion)
             if score_trial < scores[i]:
                 population[i] = trial
                 scores[i]     = score_trial
@@ -71,10 +71,14 @@ def train_de(model, criterion, train_dataloader, val_dataloader):
                 if score_trial < best_score:
                     best_score = score_trial
                     best_vec   = trial.copy()
-                    print(f"[gen {g:03d}] new best loss = {best_score:.6f}")
+                    print(f"[gen {g:03d}] new best train loss = {best_score:.6f}")
 
+        # Validation for overfitting control
+        val_loss = fitness(best_vec, model, val_dataloader, criterion)
         print(f"Generation {g+1:3d}/{DE_GENERATIONS} | "
-              f"pop-mean={scores.mean():.5f} | best={best_score:.5f}")
+              f"Population mean: {scores.mean():.5f} | "
+              f"Best train loss: {best_score:.5f} | "
+              f"Val loss: {val_loss:.5f}")
 
     # Restore best parameters before returning
     set_flat(model, best_vec)

@@ -112,7 +112,7 @@ train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True
 val_dataloader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False)
 
 model = RetentionPredictor()
-criterion = nn.MSELoss()
+criterion = nn.SmoothL1Loss()
 
 # =================== RUN EXPERIMENTS ===================
 print("\nTraining with CMA-ES 1+1:")
