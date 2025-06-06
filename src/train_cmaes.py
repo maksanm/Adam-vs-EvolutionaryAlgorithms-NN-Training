@@ -64,14 +64,14 @@ def train_cmaes_1_1(model, criterion, train_dataloader, val_dataloader):
             best_loss = candidate_loss
 
             # 6. Compute adaptation parameters
-            h = 1.0 if p_succ < p_thresh else 0.0
-            delta = (1 - h) * c_1 * c_c * (2 - c_c)
+            # h = 1.0 if p_succ < p_thresh else 0.0
+            # delta = (1 - h) * c_1 * c_c * (2 - c_c)
 
             # 7. Update evolution path
-            p_c = (1 - c_c) * p_c + h * torch.sqrt(torch.tensor(c_c * (2 - c_c))) * y_new
+            p_c = (1 - c_c) * p_c + 1 * torch.sqrt(torch.tensor(c_c * (2 - c_c))) * y_new
 
             # 8. Update covariance matrix
-            C = (1 - c_1 + delta) * C + c_1 * p_c**2
+            C = (1 - c_1 + 0) * C + c_1 * p_c**2
 
             # 9. Update Cholesky factor with margin correction
             A = torch.sqrt(torch.clamp(C, min=min_var))
