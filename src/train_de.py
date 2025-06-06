@@ -21,6 +21,7 @@ DE_CR               = float(os.getenv("DE_CR"))
 DE_GENERATIONS      = int(os.getenv("DE_GENERATIONS"))
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+torch.manual_seed(10)
 
 # =================== TRAINING FUNCTION ===================
 def train_de(model, criterion, train_dataloader, val_dataloader):

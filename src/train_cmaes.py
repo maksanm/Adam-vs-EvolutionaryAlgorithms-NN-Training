@@ -10,6 +10,7 @@ from dataset import PeptideDataset
 from model import RetentionPredictor
 from utils import evaluate
 
+torch.manual_seed(1230)
 # =================== HYPERPARAMETERS ===================
 BATCH_SIZE = int(os.getenv("BATCH_SIZE"))
 

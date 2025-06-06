@@ -18,6 +18,8 @@ BATCH_SIZE = int(os.getenv("BATCH_SIZE"))
 ADAM_LR = float(os.getenv("ADAM_LR"))
 ADAM_EPOCHS = int(os.getenv("ADAM_EPOCHS"))
 
+torch.manual_seed(10)
+
 # =================== TRAINING FUNCTION ===================
 def train_adam(model, criterion, train_dataloader, val_dataloader):
     optimizer = optim.Adam(model.parameters(), lr=ADAM_LR)
