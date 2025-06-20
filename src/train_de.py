@@ -68,7 +68,8 @@ def train_de(
         "train_loss": [],
         "val_loss": [],
         "eval_calls": 0,
-        "timestamp": []
+        "timestamp": [],
+        "pop_std": []
     }
 
     start = time.time()
@@ -101,16 +102,20 @@ def train_de(
         val_loss = fitness(best_vec, model, val_dataloader, criterion)
         eval_calls += 1
 
+        population_std = np.std(population)
+
         learning_history["generation"].append(g + 1)
         learning_history["train_loss"].append(best_score)
         learning_history["val_loss"].append(val_loss)
+        learning_history["pop_std"].append(population_std)
         learning_history["eval_calls"] = eval_calls
         learning_history["timestamp"].append(time.time() - start)
 
         print(f"Generation {g + 1:3d}/{DE_GENERATIONS} | "
               f"Population mean: {scores.mean():.5f} | "
               f"Best train loss: {best_score:.5f} | "
-              f"Val loss: {val_loss:.5f}")
+              f"Val loss: {val_loss:.5f}"
+              f"Pop. STD: {population_std:.6f}")
 
     set_flat(model, best_vec)
 
