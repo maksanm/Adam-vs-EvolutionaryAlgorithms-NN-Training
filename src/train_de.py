@@ -1,5 +1,6 @@
 import os
 import random
+import time
 
 import numpy as np
 import torch
@@ -8,7 +9,7 @@ from torch.utils.data import DataLoader
 
 from dataset import PeptideDataset
 from model import RetentionPredictor
-from utils import fitness, get_flat, set_flat
+from utils import fitness, get_flat, set_flat, evaluate_regression_metrics
 
 from dotenv import load_dotenv
 load_dotenv(override=True)
@@ -22,7 +23,12 @@ DE_CR = float(os.getenv("DE_CR"))
 DE_GENERATIONS = int(os.getenv("DE_GENERATIONS"))
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-torch.manual_seed(int(os.getenv("RANDOM_SEED")))
+
+RANDOM_SEED = int(os.getenv("RANDOM_SEED"))
+torch.manual_seed(RANDOM_SEED)
+np.random.seed(RANDOM_SEED)
+torch.cuda.manual_seed_all(RANDOM_SEED)
+random.seed(RANDOM_SEED)
 
 
 # =================== TRAINING FUNCTION ===================
@@ -35,7 +41,6 @@ def train_de(model, criterion, train_dataloader, val_dataloader):
     print(f"Starting DE: {dim:,} parameters | pop={DE_POP_SIZE} "
           f"| F={DE_F} | CR={DE_CR} | generations={DE_GENERATIONS}")
 
-    # Initial population
     base = get_flat(model)
     population = np.stack(
         [base] + [
@@ -45,13 +50,23 @@ def train_de(model, criterion, train_dataloader, val_dataloader):
     )
     scores = np.array([fitness(ind, model, train_dataloader, criterion)
                        for ind in population])
+    eval_calls = DE_POP_SIZE
 
     best_idx = int(np.argmin(scores))
     best_vec = population[best_idx].copy()
     best_score = scores[best_idx]
     print(f"Initial best train loss = {best_score:.5f}")
 
-    # Main loop
+    learning_history = {
+        "generation": [],
+        "train_loss": [],
+        "val_loss": [],
+        "eval_calls": 0,
+        "timestamp": []
+    }
+
+    start = time.time()
+
     for g in range(DE_GENERATIONS):
         for i in range(DE_POP_SIZE):
             idxs = list(range(DE_POP_SIZE))
@@ -66,6 +81,7 @@ def train_de(model, criterion, train_dataloader, val_dataloader):
             trial = np.where(cross, v, population[i])
 
             score_trial = fitness(trial, model, train_dataloader, criterion)
+            eval_calls += 1
             if score_trial < scores[i]:
                 population[i] = trial
                 scores[i] = score_trial
@@ -75,14 +91,28 @@ def train_de(model, criterion, train_dataloader, val_dataloader):
                     best_vec = trial.copy()
                     print(f"[gen {g:03d}] new best train loss = {best_score:.6f}")
 
+        set_flat(model, best_vec)
         val_loss = fitness(best_vec, model, val_dataloader, criterion)
+        eval_calls += 1
+
+        learning_history["generation"].append(g + 1)
+        learning_history["train_loss"].append(best_score)
+        learning_history["val_loss"].append(val_loss)
+        learning_history["eval_calls"] = eval_calls
+        learning_history["timestamp"].append(time.time() - start)
+
         print(f"Generation {g + 1:3d}/{DE_GENERATIONS} | "
               f"Population mean: {scores.mean():.5f} | "
               f"Best train loss: {best_score:.5f} | "
               f"Val loss: {val_loss:.5f}")
 
     set_flat(model, best_vec)
-    return model
+
+    final_metrics = evaluate_regression_metrics(model, val_dataloader)
+    learning_history["final_mse"] = final_metrics["mse"]
+    learning_history["final_mae"] = final_metrics["mae"]
+    learning_history["final_r2"] = final_metrics["r2"]
+    return model, learning_history
 
 
 if __name__ == "__main__":
@@ -114,4 +144,4 @@ if __name__ == "__main__":
 
     # =================== RUN EXPERIMENT ===================
     print("\nTraining with Differential Evolution:")
-    model = train_de(model, criterion, train_dataloader, val_dataloader)
+    model, history = train_de(model, criterion, train_dataloader, val_dataloader)
