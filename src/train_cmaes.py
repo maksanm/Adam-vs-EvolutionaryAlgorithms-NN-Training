@@ -7,7 +7,7 @@ from torch.utils.data import DataLoader
 
 from dataset import PeptideDataset
 from model import RetentionPredictor
-from utils import evaluate
+from utils import evaluate, evaluate_regression_metrics
 
 from dotenv import load_dotenv
 load_dotenv(override=True)
@@ -23,7 +23,6 @@ CMAES_C_COV = float(os.getenv("CMAES_C_COV"))
 CMAES_D_SIGMA = float(os.getenv("CMAES_D_SIGMA"))
 CMAES_P_THRESH = float(os.getenv("CMAES_P_THRESH"))
 
-# ====================== RANDOM SEED ======================
 torch.manual_seed(int(os.getenv("RANDOM_SEED")))
 
 
@@ -106,6 +105,7 @@ def train_cmaes_1_1(
             no_improve_counter += 1
 
         val_loss = evaluate(model, val_dataloader, criterion)
+        learning_history["eval_calls"] += 1
 
         learning_history["generation"].append(gen + 1)
         learning_history["train_loss"].append(best_loss)
@@ -124,6 +124,10 @@ def train_cmaes_1_1(
             break
 
     nn.utils.vector_to_parameters(current_params, model.parameters())
+    final_metrics = evaluate_regression_metrics(model, val_dataloader)
+    learning_history["final_mse"] = final_metrics["mse"]
+    learning_history["final_mae"] = final_metrics["mae"]
+    learning_history["final_r2"] = final_metrics["r2"]
     return model, learning_history
 
 
