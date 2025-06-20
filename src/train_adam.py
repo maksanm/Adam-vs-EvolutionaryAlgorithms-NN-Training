@@ -1,6 +1,3 @@
-from dotenv import load_dotenv
-load_dotenv(override=True)
-
 import os
 
 import torch
@@ -12,13 +9,17 @@ from dataset import PeptideDataset
 from model import RetentionPredictor
 from utils import evaluate
 
+from dotenv import load_dotenv
+load_dotenv(override=True)
+
 # =================== HYPERPARAMETERS ===================
 BATCH_SIZE = int(os.getenv("BATCH_SIZE"))
 
 ADAM_LR = float(os.getenv("ADAM_LR"))
 ADAM_EPOCHS = int(os.getenv("ADAM_EPOCHS"))
 
-torch.manual_seed(10)
+torch.manual_seed(int(os.getenv("RANDOM_SEED")))
+
 
 # =================== TRAINING FUNCTION ===================
 def train_adam(model, criterion, train_dataloader, val_dataloader):
@@ -39,32 +40,33 @@ def train_adam(model, criterion, train_dataloader, val_dataloader):
         print(f'Epoch {epoch + 1:3d}/{ADAM_EPOCHS} | Train Loss: {train_loss:.5f} | Val Loss: {val_loss:.5f}')
 
 
-# =================== DATA PREPARATION ===================
-sequences = []
-retention_times = []
-with open(os.getenv("DATA_PATH")) as f:
-    for line in f:
-        if not line.strip():
-            continue
-        parts = line.strip().split()
-        if len(parts) != 2:
-            continue
-        seq, rt = parts
-        sequences.append(seq)
-        retention_times.append(float(rt))
+if __name__ == "__main__":
+    # =================== DATA PREPARATION ===================
+    sequences = []
+    retention_times = []
+    with open(os.getenv("DATA_PATH")) as f:
+        for line in f:
+            if not line.strip():
+                continue
+            parts = line.strip().split()
+            if len(parts) != 2:
+                continue
+            seq, rt = parts
+            sequences.append(seq)
+            retention_times.append(float(rt))
 
-dataset = PeptideDataset(sequences, retention_times)
+    dataset = PeptideDataset(sequences, retention_times)
 
-train_size = int(0.9 * len(dataset))
-val_size = len(dataset) - train_size
-train_dataset, val_dataset = torch.utils.data.random_split(dataset, [train_size, val_size])
+    train_size = int(0.9 * len(dataset))
+    val_size = len(dataset) - train_size
+    train_dataset, val_dataset = torch.utils.data.random_split(dataset, [train_size, val_size])
 
-train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
-val_dataloader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False)
+    train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
+    val_dataloader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False)
 
-model = RetentionPredictor()
-criterion = nn.SmoothL1Loss()
+    model = RetentionPredictor()
+    criterion = nn.SmoothL1Loss()
 
-# =================== RUN EXPERIMENTS ===================
-print("Training with Adam:")
-model = train_adam(model, criterion, train_dataloader, val_dataloader)
+    # =================== RUN EXPERIMENTS ===================
+    print("Training with Adam:")
+    model = train_adam(model, criterion, train_dataloader, val_dataloader)
