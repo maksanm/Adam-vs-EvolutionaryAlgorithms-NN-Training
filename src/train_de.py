@@ -32,25 +32,31 @@ random.seed(RANDOM_SEED)
 
 
 # =================== TRAINING FUNCTION ===================
-def train_de(model, criterion, train_dataloader, val_dataloader):
-    """
-    Differential-Evolution (DE/rand/1/bin) optimiser
-    """
+def train_de(
+    model,
+    criterion,
+    train_dataloader,
+    val_dataloader,
+    de_pop_size=DE_POP_SIZE,
+    de_f=DE_F,
+    de_cr=DE_CR,
+    de_generations=DE_GENERATIONS
+):
     model.to(DEVICE)
     dim = get_flat(model).size
-    print(f"Starting DE: {dim:,} parameters | pop={DE_POP_SIZE} "
-          f"| F={DE_F} | CR={DE_CR} | generations={DE_GENERATIONS}")
+    print(f"Starting DE: {dim:,} parameters | pop={de_pop_size} "
+          f"| F={de_f} | CR={de_cr} | generations={de_generations}")
 
     base = get_flat(model)
     population = np.stack(
         [base] + [
             base + np.random.normal(0, 0.1, size=dim)
-            for _ in range(DE_POP_SIZE - 1)
+            for _ in range(de_pop_size - 1)
         ]
     )
     scores = np.array([fitness(ind, model, train_dataloader, criterion)
                        for ind in population])
-    eval_calls = DE_POP_SIZE
+    eval_calls = de_pop_size
 
     best_idx = int(np.argmin(scores))
     best_vec = population[best_idx].copy()
@@ -67,16 +73,16 @@ def train_de(model, criterion, train_dataloader, val_dataloader):
 
     start = time.time()
 
-    for g in range(DE_GENERATIONS):
-        for i in range(DE_POP_SIZE):
-            idxs = list(range(DE_POP_SIZE))
+    for g in range(de_generations):
+        for i in range(de_pop_size):
+            idxs = list(range(de_pop_size))
             idxs.remove(i)
             a, b, c = random.sample(idxs, 3)
             x_a, x_b, x_c = population[a], population[b], population[c]
 
-            v = x_a + DE_F * (x_b - x_c)
+            v = x_a + de_f * (x_b - x_c)
 
-            cross = np.random.rand(dim) < DE_CR
+            cross = np.random.rand(dim) < de_cr
             cross[random.randrange(dim)] = True
             trial = np.where(cross, v, population[i])
 
