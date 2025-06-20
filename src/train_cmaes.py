@@ -1,4 +1,5 @@
 import os
+import time
 
 import torch
 import torch.nn as nn
@@ -57,6 +58,8 @@ def train_cmaes_1_1(
     c_cov=CMAES_C_COV,
     d_sigma=CMAES_D_SIGMA,
     p_thresh=CMAES_P_THRESH,
+    sigma_min=1e-6,
+    early_stop_patience=50
 ):
     current_params = nn.utils.parameters_to_vector(model.parameters()).detach().clone()
     best_loss = evaluate(model, train_dataloader, criterion)
@@ -65,6 +68,18 @@ def train_cmaes_1_1(
     A = torch.eye(dim)
     sigma = torch.tensor(sigma_init)
     p_succ = torch.tensor(p_target)
+
+    learning_history = {
+        "generation": [],
+        "train_loss": [],
+        "val_loss": [],
+        "eval_calls": 0,
+        "sigma": [],
+        "timestamp": []
+    }
+
+    start_time = time.time()
+    no_improve_counter = 0
 
     for gen in range(generations):
 
@@ -75,6 +90,7 @@ def train_cmaes_1_1(
 
         nn.utils.vector_to_parameters(candidate_params, model.parameters())
         candidate_loss = evaluate(model, train_dataloader, criterion)
+        learning_history["eval_calls"] += 1
 
         success = float(candidate_loss < best_loss)
         sigma, p_succ = update_step_size(sigma, p_succ, success, c_p, p_target, d_sigma)
@@ -82,16 +98,33 @@ def train_cmaes_1_1(
         if success:
             current_params = candidate_params.detach().clone()
             best_loss = candidate_loss
+            no_improve_counter = 0
             if p_succ < p_thresh:
                 A = update_cholesky(A, y, c_cov)
         else:
             nn.utils.vector_to_parameters(current_params, model.parameters())
+            no_improve_counter += 1
 
         val_loss = evaluate(model, val_dataloader, criterion)
-        print(f'Gen {gen + 1:3d}/{CMAES_GENERATIONS} | Train Loss: {best_loss:.5f} | Val Loss: {val_loss:.5f} | σ: {sigma.item():.5f} | Success: {success}')
+
+        learning_history["generation"].append(gen + 1)
+        learning_history["train_loss"].append(best_loss)
+        learning_history["val_loss"].append(val_loss)
+        learning_history["sigma"].append(sigma.item())
+        learning_history["timestamp"].append(time.time() - start_time)
+
+        print(f'Gen {gen + 1:3d}/{CMAES_GENERATIONS} | Train Loss: {best_loss:.5f} | Val Loss: {val_loss:.5f} | σ: {sigma.item():.5f} | Success: {bool(success)}')
+
+        if sigma.item() < sigma_min:
+            print("Early stop: sigma ≈ 0")
+            break
+
+        if no_improve_counter >= early_stop_patience:
+            print(f"Early stop: no improvement in {early_stop_patience} generations")
+            break
 
     nn.utils.vector_to_parameters(current_params, model.parameters())
-    return model
+    return model, learning_history
 
 
 if __name__ == "__main__":
@@ -123,4 +156,4 @@ if __name__ == "__main__":
 
     # =================== RUN EXPERIMENTS ===================
     print("\nTraining with CMA-ES 1+1:")
-    model = train_cmaes_1_1(model, criterion, train_dataloader, val_dataloader)
+    model, history = train_cmaes_1_1(model, criterion, train_dataloader, val_dataloader)
