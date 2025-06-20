@@ -88,7 +88,7 @@ def train_cmaes_1_1(
         candidate_params = current_params + sigma * y
 
         nn.utils.vector_to_parameters(candidate_params, model.parameters())
-        candidate_loss = evaluate(model, train_dataloader, criterion)
+        candidate_loss = evaluate(model, train_dataloader, criterion, 'cpu')
         learning_history["eval_calls"] += 1
 
         success = float(candidate_loss < best_loss)
@@ -104,7 +104,7 @@ def train_cmaes_1_1(
             nn.utils.vector_to_parameters(current_params, model.parameters())
             no_improve_counter += 1
 
-        val_loss = evaluate(model, val_dataloader, criterion)
+        val_loss = evaluate(model, val_dataloader, criterion, 'cpu')
         learning_history["eval_calls"] += 1
 
         learning_history["generation"].append(gen + 1)

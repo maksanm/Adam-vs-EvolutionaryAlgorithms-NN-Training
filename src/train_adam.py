@@ -23,11 +23,11 @@ torch.manual_seed(int(os.getenv("RANDOM_SEED")))
 
 
 # =================== TRAINING FUNCTION ===================
-def train_adam(model, criterion, train_dataloader, val_dataloader):
-    optimizer = optim.Adam(model.parameters(), lr=ADAM_LR)
+def train_adam(model, criterion, train_dataloader, val_dataloader, epochs=ADAM_EPOCHS, lr=ADAM_LR):
+    optimizer = optim.Adam(model.parameters(), lr=lr)
 
     learning_history = {
-        "epoch": [],
+        "generation": [],
         "train_loss": [],
         "val_loss": [],
         "eval_calls": 0,
@@ -35,7 +35,7 @@ def train_adam(model, criterion, train_dataloader, val_dataloader):
     }
 
     start = time.time()
-    for epoch in range(ADAM_EPOCHS):
+    for epoch in range(epochs):
         model.train()
         epoch_train_losses = []
         for inputs, targets in train_dataloader:
@@ -48,7 +48,7 @@ def train_adam(model, criterion, train_dataloader, val_dataloader):
         train_loss = sum(epoch_train_losses) / len(epoch_train_losses)
         val_loss = evaluate(model, val_dataloader, criterion, 'cpu')
 
-        learning_history["epoch"].append(epoch + 1)
+        learning_history["generation"].append(epoch + 1)
         learning_history["train_loss"].append(train_loss)
         learning_history["val_loss"].append(val_loss)
         learning_history["eval_calls"] += 1
