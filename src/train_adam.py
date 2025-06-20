@@ -36,7 +36,7 @@ def train_adam(model, criterion, train_dataloader, val_dataloader):
             epoch_train_losses.append(loss.item())
 
         train_loss = sum(epoch_train_losses) / len(epoch_train_losses)
-        val_loss = evaluate(model, val_dataloader, criterion)
+        val_loss = evaluate(model, val_dataloader, criterion, 'cpu')
         print(f'Epoch {epoch + 1:3d}/{ADAM_EPOCHS} | Train Loss: {train_loss:.5f} | Val Loss: {val_loss:.5f}')
 
 
