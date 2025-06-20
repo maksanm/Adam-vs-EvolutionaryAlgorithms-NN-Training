@@ -1,5 +1,3 @@
-from dotenv import load_dotenv
-load_dotenv(override=True)
 import os
 
 import torch
@@ -10,110 +8,119 @@ from dataset import PeptideDataset
 from model import RetentionPredictor
 from utils import evaluate
 
-torch.manual_seed(1230)
+from dotenv import load_dotenv
+load_dotenv(override=True)
+
 # =================== HYPERPARAMETERS ===================
 BATCH_SIZE = int(os.getenv("BATCH_SIZE"))
 
 CMAES_GENERATIONS = int(os.getenv("CMAES_GENERATIONS"))
-CMAES_SIGMA = float(os.getenv("CMAES_SIGMA"))
-CMAES_ADAPT_INTERVAL = int(os.getenv("CMAES_ADAPT_INTERVAL"))
+CMAES_INITIAL_SIGMA = float(os.getenv("CMAES_INITIAL_SIGMA"))
+CMAES_P_TARGET = float(os.getenv("CMAES_P_TARGET"))
+CMAES_C_P = float(os.getenv("CMAES_C_P"))
+CMAES_C_COV = float(os.getenv("CMAES_C_COV"))
+CMAES_D_SIGMA = float(os.getenv("CMAES_D_SIGMA"))
+CMAES_P_THRESH = float(os.getenv("CMAES_P_THRESH"))
+
+# ====================== RANDOM SEED ======================
+torch.manual_seed(int(os.getenv("RANDOM_SEED")))
+
+
+# ====== (1+1)-CMA-ES with Colesky update procedures ======
+def update_cholesky(A, z, c_cov):
+    c_a = torch.sqrt(1 - torch.tensor(c_cov))
+    z2 = torch.dot(z, z)
+
+    factor = torch.sqrt(1 + ((1 - c_a**2) * z2) / (c_a**2)) - 1
+    coeff = (c_a / z2) * factor
+    Az = A @ z
+    A_new = c_a * A + coeff * torch.ger(Az, z)
+    return A_new
+
+
+def update_step_size(sigma, p_succ, success, c_p, p_target, d_sigma):
+    p_succ_new = (1 - c_p) * p_succ + c_p * success
+    sigma *= torch.exp((p_succ_new - p_target) / (d_sigma * (1 - p_target)))
+    return sigma, p_succ_new
+
 
 # =================== TRAINING FUNCTION ===================
-# GPT-generated
-def train_cmaes_1_1(model, criterion, train_dataloader, val_dataloader):
-    # Hyperparameters from the paper
-    p_target = 0.25     # Target success rate
-    c_p = 0.2           # Smoothing factor for success rate
-    c_c = 0.25          # Evolution path decay rate
-    c_1 = 0.1           # Covariance matrix learning rate
-    d_sigma = 2.0       # Damping factor for sigma update
-    p_thresh = 0.44     # Threshold for h
-    min_var = 1e-8      # Minimum variance for margin correction
-
-    # Initialize parameters
+def train_cmaes_1_1(
+    model,
+    criterion,
+    train_dataloader,
+    val_dataloader,
+    generations=CMAES_GENERATIONS,
+    sigma_init=CMAES_INITIAL_SIGMA,
+    p_target=CMAES_P_TARGET,
+    c_p=CMAES_C_P,
+    c_cov=CMAES_C_COV,
+    d_sigma=CMAES_D_SIGMA,
+    p_thresh=CMAES_P_THRESH,
+):
     current_params = nn.utils.parameters_to_vector(model.parameters()).detach().clone()
     best_loss = evaluate(model, train_dataloader, criterion)
 
-    # Initialize covariance components
-    C = torch.ones_like(current_params)  # Diagonal covariance
-    A = torch.sqrt(C)                    # Cholesky factor
-    sigma = torch.tensor(CMAES_SIGMA)
-    p_c = torch.zeros_like(current_params)  # Evolution path
-    p_succ = torch.tensor(p_target)       # Smoothed success rate
+    dim = current_params.shape[0]
+    A = torch.eye(dim)
+    sigma = torch.tensor(sigma_init)
+    p_succ = torch.tensor(p_target)
 
-    for gen in range(CMAES_GENERATIONS):
-        # 1. Generate candidate solution
-        y_new = torch.randn_like(current_params)
-        v_new = current_params + sigma * A * y_new
+    for gen in range(generations):
 
-        # 2. Evaluate candidate on training set
-        nn.utils.vector_to_parameters(v_new, model.parameters())
+        z = torch.randn(dim)
+        y = A @ z
+
+        candidate_params = current_params + sigma * y
+
+        nn.utils.vector_to_parameters(candidate_params, model.parameters())
         candidate_loss = evaluate(model, train_dataloader, criterion)
 
-        # 3. Update smoothed success rate
         success = float(candidate_loss < best_loss)
-        p_succ = (1 - c_p) * p_succ + c_p * torch.tensor(success)
+        sigma, p_succ = update_step_size(sigma, p_succ, success, c_p, p_target, d_sigma)
 
-        # 4. Update step-size
-        sigma_update = (p_succ - p_target) / (d_sigma * (1 - p_target))
-        sigma *= torch.exp(sigma_update)
-
-        if candidate_loss < best_loss:
-            # 5. Accept successful candidate
-            current_params = v_new.detach().clone()
+        if success:
+            current_params = candidate_params.detach().clone()
             best_loss = candidate_loss
-
-            # 6. Compute adaptation parameters
-            # h = 1.0 if p_succ < p_thresh else 0.0
-            # delta = (1 - h) * c_1 * c_c * (2 - c_c)
-
-            # 7. Update evolution path
-            p_c = (1 - c_c) * p_c + 1 * torch.sqrt(torch.tensor(c_c * (2 - c_c))) * y_new
-
-            # 8. Update covariance matrix
-            C = (1 - c_1 + 0) * C + c_1 * p_c**2
-
-            # 9. Update Cholesky factor with margin correction
-            A = torch.sqrt(torch.clamp(C, min=min_var))
+            if p_succ < p_thresh:
+                A = update_cholesky(A, y, c_cov)
         else:
-            # Revert parameters if candidate rejected
             nn.utils.vector_to_parameters(current_params, model.parameters())
 
-        # Calculate validation loss for logging
         val_loss = evaluate(model, val_dataloader, criterion)
-        print(f'Gen {gen + 1:3d}/{CMAES_GENERATIONS} | Train Loss: {best_loss:.5f} | Val Loss: {val_loss:.5f} | σ: {sigma.item():.5f}')
+        print(f'Gen {gen + 1:3d}/{CMAES_GENERATIONS} | Train Loss: {best_loss:.5f} | Val Loss: {val_loss:.5f} | σ: {sigma.item():.5f} | Success: {success}')
 
-    # Restore best parameters
     nn.utils.vector_to_parameters(current_params, model.parameters())
     return model
 
 
-# =================== DATA PREPARATION ===================
-sequences = []
-retention_times = []
-with open(os.getenv("DATA_PATH")) as f:
-    for line in f:
-        if not line.strip():
-            continue
-        parts = line.strip().split()
-        if len(parts) != 2:
-            continue
-        seq, rt = parts
-        sequences.append(seq)
-        retention_times.append(float(rt))
+if __name__ == "__main__":
+    # =================== DATA PREPARATION ===================
+    sequences = []
+    retention_times = []
+    with open(os.getenv("DATA_PATH")) as f:
+        for line in f:
+            if not line.strip():
+                continue
+            parts = line.strip().split()
+            if len(parts) != 2:
+                continue
+            seq, rt = parts
+            sequences.append(seq)
+            retention_times.append(float(rt))
 
-dataset = PeptideDataset(sequences, retention_times)
+    dataset = PeptideDataset(sequences, retention_times)
 
-train_size = int(0.9 * len(dataset))
-val_size = len(dataset) - train_size
-train_dataset, val_dataset = torch.utils.data.random_split(dataset, [train_size, val_size])
+    train_size = int(0.9 * len(dataset))
+    val_size = len(dataset) - train_size
+    train_dataset, val_dataset = torch.utils.data.random_split(dataset, [train_size, val_size])
 
-train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
-val_dataloader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False)
+    train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
+    val_dataloader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False)
 
-model = RetentionPredictor()
-criterion = nn.SmoothL1Loss()
+    model = RetentionPredictor()
+    criterion = nn.SmoothL1Loss()
 
-# =================== RUN EXPERIMENTS ===================
-print("\nTraining with CMA-ES 1+1:")
-model = train_cmaes_1_1(model, criterion, train_dataloader, val_dataloader)
+    # =================== RUN EXPERIMENTS ===================
+    print("\nTraining with CMA-ES 1+1:")
+    model = train_cmaes_1_1(model, criterion, train_dataloader, val_dataloader)
