@@ -21,9 +21,12 @@ ADAM_EPOCHS = int(os.getenv("ADAM_EPOCHS"))
 
 torch.manual_seed(int(os.getenv("RANDOM_SEED")))
 
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 
 # =================== TRAINING FUNCTION ===================
 def train_adam(model, criterion, train_dataloader, val_dataloader, epochs=ADAM_EPOCHS, lr=ADAM_LR):
+    model.to(DEVICE)
     optimizer = optim.Adam(model.parameters(), lr=lr)
 
     learning_history = {
@@ -46,7 +49,7 @@ def train_adam(model, criterion, train_dataloader, val_dataloader, epochs=ADAM_E
             epoch_train_losses.append(loss.item())
 
         train_loss = sum(epoch_train_losses) / len(epoch_train_losses)
-        val_loss = evaluate(model, val_dataloader, criterion, 'cpu')
+        val_loss = evaluate(model, val_dataloader, criterion, DEVICE)
 
         learning_history["generation"].append(epoch + 1)
         learning_history["train_loss"].append(train_loss)

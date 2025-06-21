@@ -4,7 +4,7 @@ import torch.nn as nn
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 
 
-def evaluate(model, dataloader, criterion, device='cuda'):
+def evaluate(model, dataloader, criterion, device='cpu'):
     model.eval()
     total_loss = 0.0
     with torch.no_grad():

@@ -25,6 +25,8 @@ CMAES_P_THRESH = float(os.getenv("CMAES_P_THRESH"))
 
 torch.manual_seed(int(os.getenv("RANDOM_SEED")))
 
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 
 # ====== (1+1)-CMA-ES with Colesky update procedures ======
 def update_cholesky(A, z, c_cov):
@@ -58,10 +60,12 @@ def train_cmaes_1_1(
     d_sigma=CMAES_D_SIGMA,
     p_thresh=CMAES_P_THRESH,
     sigma_min=1e-6,
-    early_stop_patience=50
+    early_stop_patience=100
 ):
+    model.to(DEVICE)
+
     current_params = nn.utils.parameters_to_vector(model.parameters()).detach().clone()
-    best_loss = evaluate(model, train_dataloader, criterion)
+    best_loss = evaluate(model, train_dataloader, criterion, DEVICE)
 
     dim = current_params.shape[0]
     A = torch.eye(dim)
@@ -88,7 +92,7 @@ def train_cmaes_1_1(
         candidate_params = current_params + sigma * y
 
         nn.utils.vector_to_parameters(candidate_params, model.parameters())
-        candidate_loss = evaluate(model, train_dataloader, criterion, 'cpu')
+        candidate_loss = evaluate(model, train_dataloader, criterion, DEVICE)
         learning_history["eval_calls"] += 1
 
         success = float(candidate_loss < best_loss)
@@ -104,7 +108,7 @@ def train_cmaes_1_1(
             nn.utils.vector_to_parameters(current_params, model.parameters())
             no_improve_counter += 1
 
-        val_loss = evaluate(model, val_dataloader, criterion, 'cpu')
+        val_loss = evaluate(model, val_dataloader, criterion, DEVICE)
         learning_history["eval_calls"] += 1
 
         learning_history["generation"].append(gen + 1)

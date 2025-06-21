@@ -37,26 +37,26 @@ def train_de(
     criterion,
     train_dataloader,
     val_dataloader,
-    de_pop_size=DE_POP_SIZE,
-    de_f=DE_F,
-    de_cr=DE_CR,
-    de_generations=DE_GENERATIONS
+    pop_size=DE_POP_SIZE,
+    f=DE_F,
+    cr=DE_CR,
+    generations=DE_GENERATIONS
 ):
     model.to(DEVICE)
     dim = get_flat(model).size
-    print(f"Starting DE: {dim:,} parameters | pop={de_pop_size} "
-          f"| F={de_f} | CR={de_cr} | generations={de_generations}")
+    print(f"Starting DE: {dim:,} parameters | pop={pop_size} "
+          f"| F={f} | CR={cr} | generations={generations}")
 
     base = get_flat(model)
     population = np.stack(
         [base] + [
             base + np.random.normal(0, 0.1, size=dim)
-            for _ in range(de_pop_size - 1)
+            for _ in range(pop_size - 1)
         ]
     )
     scores = np.array([fitness(ind, model, train_dataloader, criterion)
                        for ind in population])
-    eval_calls = de_pop_size
+    eval_calls = pop_size
 
     best_idx = int(np.argmin(scores))
     best_vec = population[best_idx].copy()
@@ -74,16 +74,16 @@ def train_de(
 
     start = time.time()
 
-    for g in range(de_generations):
-        for i in range(de_pop_size):
-            idxs = list(range(de_pop_size))
+    for g in range(generations):
+        for i in range(pop_size):
+            idxs = list(range(pop_size))
             idxs.remove(i)
             a, b, c = random.sample(idxs, 3)
             x_a, x_b, x_c = population[a], population[b], population[c]
 
-            v = x_a + de_f * (x_b - x_c)
+            v = x_a + f * (x_b - x_c)
 
-            cross = np.random.rand(dim) < de_cr
+            cross = np.random.rand(dim) < cr
             cross[random.randrange(dim)] = True
             trial = np.where(cross, v, population[i])
 
@@ -114,7 +114,7 @@ def train_de(
         print(f"Generation {g + 1:3d}/{DE_GENERATIONS} | "
               f"Population mean: {scores.mean():.5f} | "
               f"Best train loss: {best_score:.5f} | "
-              f"Val loss: {val_loss:.5f}"
+              f"Val loss: {val_loss:.5f} | "
               f"Pop. STD: {population_std:.6f}")
 
     set_flat(model, best_vec)
