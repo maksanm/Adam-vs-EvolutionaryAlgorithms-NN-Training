@@ -103,7 +103,7 @@ def train_cmaes_1_1(
             best_loss = candidate_loss
             no_improve_counter = 0
             if p_succ < p_thresh:
-                A = update_cholesky(A, y, c_cov)
+                A = update_cholesky(A, z, c_cov)
         else:
             nn.utils.vector_to_parameters(current_params, model.parameters())
             no_improve_counter += 1
