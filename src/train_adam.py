@@ -57,7 +57,7 @@ def train_adam(model, criterion, train_dataloader, val_dataloader, epochs=ADAM_E
         learning_history["eval_calls"] += 1
         learning_history["timestamp"].append(time.time() - start)
 
-        print(f'Epoch {epoch + 1:3d}/{ADAM_EPOCHS} | Train Loss: {train_loss:.5f} | Val Loss: {val_loss:.5f}')
+        print(f'Epoch {epoch + 1:3d}/{epochs} | Train Loss: {train_loss:.5f} | Val Loss: {val_loss:.5f}')
 
     metrics = evaluate_regression_metrics(model, val_dataloader)
     learning_history["final_mse"] = metrics["mse"]

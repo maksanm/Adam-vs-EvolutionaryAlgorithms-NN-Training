@@ -111,7 +111,7 @@ def train_de(
         learning_history["eval_calls"] = eval_calls
         learning_history["timestamp"].append(time.time() - start)
 
-        print(f"Generation {g + 1:3d}/{DE_GENERATIONS} | "
+        print(f"Generation {g + 1:3d}/{generations} | "
               f"Population mean: {scores.mean():.5f} | "
               f"Best train loss: {best_score:.5f} | "
               f"Val loss: {val_loss:.5f} | "
