@@ -42,6 +42,7 @@ def train_adam(model, criterion, train_dataloader, val_dataloader, epochs=ADAM_E
         model.train()
         epoch_train_losses = []
         for inputs, targets in train_dataloader:
+            inputs, targets = inputs.to(DEVICE), targets.to(DEVICE)
             optimizer.zero_grad()
             loss = criterion(model(inputs), targets)
             loss.backward()
@@ -59,7 +60,7 @@ def train_adam(model, criterion, train_dataloader, val_dataloader, epochs=ADAM_E
 
         print(f'Epoch {epoch + 1:3d}/{epochs} | Train Loss: {train_loss:.5f} | Val Loss: {val_loss:.5f}')
 
-    metrics = evaluate_regression_metrics(model, val_dataloader)
+    metrics = evaluate_regression_metrics(model, val_dataloader, DEVICE)
     learning_history["final_mse"] = metrics["mse"]
     learning_history["final_mae"] = metrics["mae"]
     learning_history["final_r2"] = metrics["r2"]

@@ -31,18 +31,19 @@ def set_flat(model: nn.Module, vec: np.ndarray) -> None:
             idx += n
 
 
-def fitness(vec: np.ndarray, model, dataloader, criterion):
+def fitness(vec: np.ndarray, model, dataloader, criterion, device='cpu'):
     set_flat(model, vec)
-    return evaluate(model, dataloader, criterion)
+    return evaluate(model, dataloader, criterion, device)
 
 
-def evaluate_regression_metrics(model, dataloader):
+def evaluate_regression_metrics(model, dataloader, device='cpu'):
     was_training = model.training
     model.eval()
     preds, targets = [], []
 
     with torch.no_grad():
         for x, y in dataloader:
+            x, y = x.to(device), y.to(device)
             outputs = model(x)
             preds.append(outputs.view(-1).cpu())
             targets.append(y.view(-1).cpu())

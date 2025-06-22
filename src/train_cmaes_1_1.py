@@ -68,8 +68,8 @@ def train_cmaes_1_1(
     best_loss = evaluate(model, train_dataloader, criterion, DEVICE)
 
     dim = current_params.shape[0]
-    A = torch.eye(dim)
-    sigma = torch.tensor(sigma_init)
+    A = torch.eye(dim).to(DEVICE)
+    sigma = torch.tensor(sigma_init).to(DEVICE)
     p_succ = torch.tensor(p_target)
 
     learning_history = {
@@ -86,8 +86,12 @@ def train_cmaes_1_1(
 
     for gen in range(generations):
 
-        z = torch.randn(dim)
+        z = torch.randn(dim).to(DEVICE)
         y = A @ z
+
+        # print(current_params.get_device())
+        # print(sigma.get_device())
+        # print(y.get_device())
 
         candidate_params = current_params + sigma * y
 
@@ -128,7 +132,7 @@ def train_cmaes_1_1(
             break
 
     nn.utils.vector_to_parameters(current_params, model.parameters())
-    final_metrics = evaluate_regression_metrics(model, val_dataloader)
+    final_metrics = evaluate_regression_metrics(model, val_dataloader, DEVICE)
     learning_history["final_mse"] = final_metrics["mse"]
     learning_history["final_mae"] = final_metrics["mae"]
     learning_history["final_r2"] = final_metrics["r2"]

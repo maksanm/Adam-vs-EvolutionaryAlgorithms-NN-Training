@@ -54,7 +54,7 @@ def train_de(
             for _ in range(pop_size - 1)
         ]
     )
-    scores = np.array([fitness(ind, model, train_dataloader, criterion)
+    scores = np.array([fitness(ind, model, train_dataloader, criterion, DEVICE)
                        for ind in population])
     eval_calls = pop_size
 
@@ -87,7 +87,7 @@ def train_de(
             cross[random.randrange(dim)] = True
             trial = np.where(cross, v, population[i])
 
-            score_trial = fitness(trial, model, train_dataloader, criterion)
+            score_trial = fitness(trial, model, train_dataloader, criterion, DEVICE)
             eval_calls += 1
             if score_trial < scores[i]:
                 population[i] = trial
@@ -99,7 +99,7 @@ def train_de(
                     print(f"[gen {g:03d}] new best train loss = {best_score:.6f}")
 
         set_flat(model, best_vec)
-        val_loss = fitness(best_vec, model, val_dataloader, criterion)
+        val_loss = fitness(best_vec, model, val_dataloader, criterion, DEVICE)
         eval_calls += 1
 
         population_std = np.std(population)
@@ -119,7 +119,7 @@ def train_de(
 
     set_flat(model, best_vec)
 
-    final_metrics = evaluate_regression_metrics(model, val_dataloader)
+    final_metrics = evaluate_regression_metrics(model, val_dataloader, DEVICE)
     learning_history["final_mse"] = final_metrics["mse"]
     learning_history["final_mae"] = final_metrics["mae"]
     learning_history["final_r2"] = final_metrics["r2"]
