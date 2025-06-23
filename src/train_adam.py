@@ -51,12 +51,12 @@ def train_adam(model, criterion, train_dataloader, val_dataloader, epochs=ADAM_E
 
         train_loss = sum(epoch_train_losses) / len(epoch_train_losses)
         val_loss = evaluate(model, val_dataloader, criterion, DEVICE)
+        learning_history["timestamp"].append(time.time() - start)
 
         learning_history["generation"].append(epoch + 1)
         learning_history["train_loss"].append(train_loss)
         learning_history["val_loss"].append(val_loss)
         learning_history["eval_calls"] += 1
-        learning_history["timestamp"].append(time.time() - start)
 
         print(f'Epoch {epoch + 1:3d}/{epochs} | Train Loss: {train_loss:.5f} | Val Loss: {val_loss:.5f}')
 

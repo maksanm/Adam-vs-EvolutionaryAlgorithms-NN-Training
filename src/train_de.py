@@ -101,6 +101,7 @@ def train_de(
         set_flat(model, best_vec)
         val_loss = fitness(best_vec, model, val_dataloader, criterion, DEVICE)
         eval_calls += 1
+        learning_history["timestamp"].append(time.time() - start)
 
         population_std = np.std(population)
 
@@ -109,7 +110,6 @@ def train_de(
         learning_history["val_loss"].append(val_loss)
         learning_history["pop_std"].append(population_std)
         learning_history["eval_calls"] = eval_calls
-        learning_history["timestamp"].append(time.time() - start)
 
         print(f"Generation {g + 1:3d}/{generations} | "
               f"Population mean: {scores.mean():.5f} | "

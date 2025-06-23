@@ -23,6 +23,9 @@ CMAES_C_COV = float(os.getenv("CMAES_C_COV"))
 CMAES_D_SIGMA = float(os.getenv("CMAES_D_SIGMA"))
 CMAES_P_THRESH = float(os.getenv("CMAES_P_THRESH"))
 
+CMAES_SIGMA_MIN = float(os.getenv("CMAES_SIGMA_MIN"))
+CMAES_EARLY_STOP_PATIENCE = int(os.getenv("CMAES_EARLY_STOP_PATIENCE"))
+
 torch.manual_seed(int(os.getenv("RANDOM_SEED")))
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -59,8 +62,8 @@ def train_cmaes_1_1(
     c_cov=CMAES_C_COV,
     d_sigma=CMAES_D_SIGMA,
     p_thresh=CMAES_P_THRESH,
-    sigma_min=1e-6,
-    early_stop_patience=100
+    sigma_min=CMAES_SIGMA_MIN,
+    early_stop_patience=CMAES_EARLY_STOP_PATIENCE
 ):
     model.to(DEVICE)
 
@@ -113,13 +116,13 @@ def train_cmaes_1_1(
             no_improve_counter += 1
 
         val_loss = evaluate(model, val_dataloader, criterion, DEVICE)
+        learning_history["timestamp"].append(time.time() - start_time)
         learning_history["eval_calls"] += 1
 
         learning_history["generation"].append(gen + 1)
         learning_history["train_loss"].append(best_loss)
         learning_history["val_loss"].append(val_loss)
         learning_history["sigma"].append(sigma.item())
-        learning_history["timestamp"].append(time.time() - start_time)
 
         print(f'Gen {gen + 1:3d}/{CMAES_GENERATIONS} | Train Loss: {best_loss:.5f} | Val Loss: {val_loss:.5f} | σ: {sigma.item():.5f} | Success: {bool(success)}')
 
@@ -169,3 +172,8 @@ if __name__ == "__main__":
     # =================== RUN EXPERIMENTS ===================
     print("\nTraining with CMA-ES 1+1:")
     model, history = train_cmaes_1_1(model, criterion, train_dataloader, val_dataloader)
+    print("\n\nFinal Metrics Summary:")
+    print('CMAES_C_COV', CMAES_C_COV)
+    print('CMAES_D_SIGMA', CMAES_D_SIGMA)
+    print("=" * 40)
+    print(f"Val R2: {history['final_r2']:.3f} | MSE: {history['final_mse']:.4f} | MAE: {history['final_mae']:.4f} | Eval Calls: {history['eval_calls']} | Time: {history['timestamp'][-1]:.2f}s")
